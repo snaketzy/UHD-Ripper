@@ -2,6 +2,8 @@
 
 # dependencies
 /node_modules
+server/node_modules
+web/node_modules
 /.pnp
 .pnp.*
 .yarn/*
@@ -13,11 +15,8 @@
 # testing
 /coverage
 
-# next.js
-/.next/
-/out/
-
-# production
+# vite / build output
+web/dist
 /build
 
 # misc
@@ -46,3 +45,10 @@ next-env.d.ts
 .eslintcache
 .turbo
 .swc
+
+# runtime data（本地解密缓存与上传临时文件，体积可能很大）
+server/data/uploads
+server/data/rips
+
+# 默认导出目录
+/output
