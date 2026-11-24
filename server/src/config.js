@@ -20,6 +20,11 @@ export const RIP_ROOT = process.env.RIP_ROOT
   ? path.resolve(process.env.RIP_ROOT)
   : path.join(SERVER_ROOT, 'data', 'rips');
 
+/** 自动挂载 ISO 的挂载点根目录：每个 ISO 一个子目录（macOS 下由 hdiutil 挂载） */
+export const ISO_MOUNT_ROOT = process.env.ISO_MOUNT_ROOT
+  ? path.resolve(process.env.ISO_MOUNT_ROOT)
+  : path.join(SERVER_ROOT, 'data', 'iso-mounts');
+
 /** 单个上传文件体积上限，默认 60GB（本系统主要走光盘提取，上传接口作为兜底） */
 export const MAX_UPLOAD_BYTES = Number(process.env.MAX_UPLOAD_BYTES || 60 * 1024 * 1024 * 1024);
 

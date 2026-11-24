@@ -153,7 +153,8 @@ export function DiscSourceCard() {
           <div className="space-y-1">
             <p className="text-sm font-medium">MakeMKV 扫描崩溃时，直接导入主片文件</p>
             <p className="text-muted-foreground text-xs">
-              可直接选择主片 <span className="font-mono">.m2ts / .mkv / .mp4</span> 文件，或直接粘贴 BDMV 根目录；填目录时会自动识别体积最大的主片并导入
+              可直接选择主片 <span className="font-mono">.m2ts / .mkv / .mp4</span> 文件，或粘贴 BDMV 根目录 /{' '}
+              <span className="font-mono">.iso</span> 镜像路径；填目录或 ISO 时会自动识别体积最大的主片并导入（ISO 会自动挂载）
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -168,7 +169,7 @@ export function DiscSourceCard() {
             <Input
               value={localMediaPath}
               onChange={(event) => dispatch(localMediaPathChanged(event.target.value))}
-              placeholder="也可直接粘贴绝对路径，例如 /Volumes/.../BDMV/STREAM/00006.m2ts 或 /Volumes/.../电影目录"
+              placeholder="也可直接粘贴绝对路径，例如 /Volumes/.../BDMV/STREAM/00006.m2ts、/Volumes/.../电影目录 或 /Volumes/.../MOVIE.iso"
               className="min-w-[16rem] flex-1 font-mono text-xs"
             />
             <Button
@@ -184,7 +185,7 @@ export function DiscSourceCard() {
               onClick={() => void dispatch(importMainTitleFromDisc())}
             >
               {localMediaImportBusy ? <Loader2 className="animate-spin" /> : <Disc3 />}
-              {localMediaImportBusy ? '识别中…' : '从当前 BDMV 自动导入主片'}
+              {localMediaImportBusy ? '识别中…' : '从当前来源自动导入主片'}
             </Button>
           </div>
           {localMediaPickerError && (

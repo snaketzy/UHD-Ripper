@@ -18,6 +18,7 @@ import { probeMedia } from '../lib/probe.js';
 import { buildPlan, normalizeSubtitleFormat } from '../lib/export.js';
 import { cancelBatchJob, runBatchJob } from '../lib/batch.js';
 import { buildSourceSpec, findMainStreamFile, scanDisc } from '../lib/disc.js';
+import { isIsoPath, mountIso, releaseIso } from '../lib/iso.js';
 import { cancelRipJob, runRipJob } from '../lib/ripRunner.js';
 import { baseNameOf, uniqueFileName } from '../lib/trackName.js';
 import {
@@ -46,6 +47,50 @@ function discRootName(inputPath) {
 
 function importedMainTitleName(discPath, mainFilePath) {
   return `${discRootName(discPath)}${path.extname(mainFilePath).toLowerCase()}`;
+}
+
+/**
+ * 定位主片：BDMV 目录直接查找；ISO 镜像先自动挂载为只读卷再查找。
+ * 返回主片文件、ISO 来源路径（用于后续卸载）与命名基名。
+ */
+async function locateMainTitle(resolvedPath) {
+  if (!isIsoPath(resolvedPath)) {
+    const mainFile = await findMainStreamFile(resolvedPath);
+    return { mainFile, isoPath: null, nameBase: null };
+  }
+
+  const stat = await fs.stat(resolvedPath).catch(() => null);
+  if (!stat?.isFile()) {
+    throw new Error('ISO 文件不存在');
+  }
+
+  const mountPoint = await mountIso(resolvedPath);
+  try {
+    const mainFile = await findMainStreamFile(mountPoint);
+    return { mainFile, isoPath: resolvedPath, nameBase: path.basename(resolvedPath, path.extname(resolvedPath)) };
+  } catch (error) {
+    await releaseIso(resolvedPath);
+    throw error;
+  }
+}
+
+/** 从 BDMV 目录或 ISO 镜像导入体积最大的主片，生成可直接导出的 mediaJob */
+async function importMainTitle(resolvedPath) {
+  const { mainFile, isoPath, nameBase } = await locateMainTitle(resolvedPath);
+  const originalName = nameBase
+    ? `${nameBase}${path.extname(mainFile.path).toLowerCase()}`
+    : importedMainTitleName(resolvedPath, mainFile.path);
+  const mediaInfo = await probeMedia(mainFile.path, originalName);
+  const job = createMediaJob({
+    originalName,
+    storedPath: mainFile.path,
+    mediaInfo,
+    sizeBytes: mainFile.size,
+    uploadDir: null,
+    cleanupDir: null,
+    isoPath,
+  });
+  return { sourcePath: mainFile.path, job };
 }
 
 function toStreamIndexes(value) {
@@ -99,7 +144,7 @@ apiRouter.post('/disc/pick-source', async (req, res, next) => {
 /** 调起系统原生选择框，挑选本地媒体文件（例如主片 m2ts / mkv） */
 apiRouter.post('/media/pick-file', async (_req, res, next) => {
   try {
-    const result = await pickFile({ prompt: '请选择本地媒体文件（如主片 m2ts / mkv）' });
+    const result = await pickFile({ prompt: '请选择本地媒体文件或 ISO 镜像（如主片 m2ts / mkv / iso）' });
     res.json(result);
   } catch (error) {
     if (error instanceof FolderPickerUnsupportedError) {
@@ -161,18 +206,8 @@ apiRouter.post('/media/import-path', async (req, res, next) => {
       return;
     }
 
-    if (stat.isDirectory()) {
-      const mainFile = await findMainStreamFile(resolved);
-      const originalName = importedMainTitleName(resolved, mainFile.path);
-      const mediaInfo = await probeMedia(mainFile.path, originalName);
-      const job = createMediaJob({
-        originalName,
-        storedPath: mainFile.path,
-        mediaInfo,
-        sizeBytes: mainFile.size,
-        uploadDir: null,
-        cleanupDir: null,
-      });
+    if (stat.isDirectory() || (stat.isFile() && isIsoPath(resolved))) {
+      const { job } = await importMainTitle(resolved);
       res.json(serializeMedia(job));
       return;
     }
@@ -198,12 +233,12 @@ apiRouter.post('/media/import-path', async (req, res, next) => {
   }
 });
 
-/** 从 BDMV 目录中自动选择体积最大的 m2ts 作为主片并导入 */
+/** 从 BDMV 目录或 ISO 镜像中自动选择体积最大的 m2ts 作为主片并导入 */
 apiRouter.post('/media/import-main-title', async (req, res, next) => {
   try {
     const sourcePath = String(req.body?.sourcePath || '').trim();
     if (!sourcePath) {
-      res.status(400).json({ error: '请先选择或填写 BDMV 光盘根目录' });
+      res.status(400).json({ error: '请先选择或填写 BDMV 光盘根目录或 ISO 镜像路径' });
       return;
     }
     if (!path.isAbsolute(sourcePath)) {
@@ -211,19 +246,10 @@ apiRouter.post('/media/import-main-title', async (req, res, next) => {
       return;
     }
 
-    const mainFile = await findMainStreamFile(sourcePath);
-    const originalName = importedMainTitleName(sourcePath, mainFile.path);
-    const mediaInfo = await probeMedia(mainFile.path, originalName);
-    const job = createMediaJob({
-      originalName,
-      storedPath: mainFile.path,
-      mediaInfo,
-      sizeBytes: mainFile.size,
-      uploadDir: null,
-      cleanupDir: null,
-    });
+    const resolved = path.resolve(sourcePath);
+    const { sourcePath: mainPath, job } = await importMainTitle(resolved);
     res.json({
-      sourcePath: mainFile.path,
+      sourcePath: mainPath,
       media: serializeMedia(job),
     });
   } catch (error) {

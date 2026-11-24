@@ -296,8 +296,8 @@ export async function scanDisc(sourceSpec) {
   }).catch((error) => {
     if (error?.signal === 'SIGSEGV') {
       const extra = sourceSpec.startsWith('file:')
-        ? '该 BDMV 目录会触发 MakeMKV 自身崩溃，通常是盘结构元数据兼容性问题。建议重新拷贝/重新制作 ISO，或直接改走主片 m2ts 文件。'
-        : 'MakeMKV 在扫描该来源时发生原生崩溃。';
+        ? '该 BDMV 目录会触发 MakeMKV 自身崩溃，通常是盘结构元数据兼容性问题。请改用「MakeMKV 扫描崩溃时，直接导入主片文件」，粘贴 ISO 镜像或 BDMV 目录路径直接导入主片。'
+        : 'MakeMKV 在扫描该 ISO 时发生原生崩溃。请改用「MakeMKV 扫描崩溃时，直接导入主片文件」，粘贴该 ISO 路径直接导入主片（应用会自动挂载 ISO）。';
       throw new Error(`扫描光盘失败：${extra}`);
     }
     throw new Error(`扫描光盘失败：${error.message}`);

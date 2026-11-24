@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { JOB_TTL_MS, RIP_ROOT, UPLOAD_ROOT } from '../config.js';
+import { releaseIso } from './iso.js';
 
 /** mediaId -> 媒体任务（含暂存文件路径、探测结果）。无论来自本地上传还是光盘提取，结构一致 */
 const mediaJobs = new Map();
@@ -14,7 +15,15 @@ const discJobs = new Map();
 /** ripId -> 批量提取 Title 任务 */
 const ripJobs = new Map();
 
-export function createMediaJob({ originalName, storedPath, mediaInfo, sizeBytes, uploadDir = path.dirname(storedPath), cleanupDir = uploadDir }) {
+export function createMediaJob({
+  originalName,
+  storedPath,
+  mediaInfo,
+  sizeBytes,
+  uploadDir = path.dirname(storedPath),
+  cleanupDir = uploadDir,
+  isoPath = null,
+}) {
   const id = randomUUID();
   const job = {
     id,
@@ -24,6 +33,8 @@ export function createMediaJob({ originalName, storedPath, mediaInfo, sizeBytes,
     mediaInfo,
     uploadDir,
     cleanupDir,
+    /** 若来源是自动挂载的 ISO，记录其路径，任务清理时据此卸载 */
+    isoPath,
     createdAt: Date.now(),
   };
   mediaJobs.set(id, job);
@@ -298,6 +309,7 @@ export async function dropMediaJob(id) {
     if (exportJob.mediaId === id) exportJobs.delete(exportId);
   }
   if (job.cleanupDir) await removeDir(job.cleanupDir);
+  if (job.isoPath) await releaseIso(job.isoPath);
   return true;
 }
 

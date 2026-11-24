@@ -6,6 +6,7 @@ import { HOST, JOB_TTL_MS, PORT, WEB_DIST } from './config.js';
 import { apiRouter } from './routes/api.js';
 import { describeBinaries } from './lib/binaries.js';
 import { ensureUploadRoot, sweepExpired, sweepOrphanUploadDirs } from './lib/jobs.js';
+import { sweepIsoMounts } from './lib/iso.js';
 
 const app = express();
 
@@ -40,6 +41,9 @@ await ensureUploadRoot().catch((error) => {
 
 // 服务重启后内存中的任务记录会丢失，启动时清掉遗留的暂存目录
 await sweepOrphanUploadDirs().catch((error) => console.error('[cleanup]', error.message));
+
+// 清理上次运行遗留的 ISO 挂载（内存中的引用计数已丢失）
+await sweepIsoMounts().catch((error) => console.error('[cleanup]', error.message));
 
 setInterval(() => {
   sweepExpired().catch((error) => console.error('[cleanup]', error.message));
