@@ -3,7 +3,7 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { ffmpegPath } from './binaries.js';
 import { baseNameOf, uniqueFileName } from './trackName.js';
-import { AUDIO_BITRATE, UPLOAD_ROOT } from '../config.js';
+import { AUDIO_BITRATE } from '../config.js';
 
 /** libmp3lame 支持的采样率，其他采样率需要重采样 */
 const MP3_SAMPLE_RATES = new Set([8000, 11025, 12000, 16000, 22050, 24000, 32000, 44100, 48000]);
@@ -381,7 +381,7 @@ async function resolveOutputStrategy(exportJob, media) {
 
   // 对“直接导入的本地文件”，不要把暂存目录建在源文件旁边；
   // 外置硬盘/蓝光目录常常只读或受权限限制，会导致 mkdir staging 直接失败。
-  const baseDir = media.uploadDir || path.join(UPLOAD_ROOT, '__imported_media__', media.id);
+  const baseDir = media.stagingDir;
   const stagingDir = path.join(baseDir, '__export_staging__', exportJob.id);
   await fs.mkdir(stagingDir, { recursive: true });
   return {

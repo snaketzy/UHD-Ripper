@@ -77,20 +77,26 @@ async function locateMainTitle(resolvedPath) {
 /** 从 BDMV 目录或 ISO 镜像导入体积最大的主片，生成可直接导出的 mediaJob */
 async function importMainTitle(resolvedPath) {
   const { mainFile, isoPath, nameBase } = await locateMainTitle(resolvedPath);
-  const originalName = nameBase
-    ? `${nameBase}${path.extname(mainFile.path).toLowerCase()}`
-    : importedMainTitleName(resolvedPath, mainFile.path);
-  const mediaInfo = await probeMedia(mainFile.path, originalName);
-  const job = createMediaJob({
-    originalName,
-    storedPath: mainFile.path,
-    mediaInfo,
-    sizeBytes: mainFile.size,
-    uploadDir: null,
-    cleanupDir: null,
-    isoPath,
-  });
-  return { sourcePath: mainFile.path, job };
+  try {
+    const originalName = nameBase
+      ? `${nameBase}${path.extname(mainFile.path).toLowerCase()}`
+      : importedMainTitleName(resolvedPath, mainFile.path);
+    const mediaInfo = await probeMedia(mainFile.path, originalName);
+    const job = createMediaJob({
+      originalName,
+      storedPath: mainFile.path,
+      mediaInfo,
+      sizeBytes: mainFile.size,
+      uploadDir: null,
+      cleanupDir: null,
+      isoPath,
+    });
+    return { sourcePath: mainFile.path, job };
+  } catch (error) {
+    // mediaJob 未创建成功时没有任务负责释放挂载，这里立即卸载，避免 ISO 一直挂着
+    if (isoPath) await releaseIso(isoPath);
+    throw error;
+  }
 }
 
 function toStreamIndexes(value) {

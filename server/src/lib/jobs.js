@@ -15,6 +15,9 @@ const discJobs = new Map();
 /** ripId -> 批量提取 Title 任务 */
 const ripJobs = new Map();
 
+/** 导入类媒体（ISO / BDMV 主片）没有上传目录，导出暂存放在这个容器目录下 */
+const IMPORTED_MEDIA_DIR = '__imported_media__';
+
 export function createMediaJob({
   originalName,
   storedPath,
@@ -33,6 +36,8 @@ export function createMediaJob({
     mediaInfo,
     uploadDir,
     cleanupDir,
+    /** 导出暂存根目录：导入类媒体使用 __imported_media__/<id>，避免写源文件所在磁盘 */
+    stagingDir: uploadDir || path.join(UPLOAD_ROOT, IMPORTED_MEDIA_DIR, id),
     /** 若来源是自动挂载的 ISO，记录其路径，任务清理时据此卸载 */
     isoPath,
     createdAt: Date.now(),
@@ -309,28 +314,35 @@ export async function dropMediaJob(id) {
     if (exportJob.mediaId === id) exportJobs.delete(exportId);
   }
   if (job.cleanupDir) await removeDir(job.cleanupDir);
+  if (job.stagingDir && job.stagingDir !== job.cleanupDir) await removeDir(job.stagingDir);
   if (job.isoPath) await releaseIso(job.isoPath);
   return true;
 }
 
 /** 清理某个根目录下，没有对应 mediaJob 的孤儿暂存目录（例如服务重启后遗留的目录） */
-async function sweepOrphanDirsIn(root) {
-  const activeDirs = new Set(
-    [...mediaJobs.values()]
-      .map((job) => job.uploadDir)
-      .filter(Boolean)
-      .map((dir) => path.basename(dir))
-  );
+async function sweepOrphanDirsIn(root, activeDirs) {
   const entries = await fs.readdir(root, { withFileTypes: true }).catch(() => []);
   for (const entry of entries) {
     if (!entry.isDirectory() || activeDirs.has(entry.name)) continue;
-    await removeDir(path.join(root, entry.name));
+    const fullPath = path.join(root, entry.name);
+    // 导入类媒体的容器目录：继续按 mediaId 往里清理，不能整体删除
+    if (entry.name === IMPORTED_MEDIA_DIR) {
+      await sweepOrphanDirsIn(fullPath, activeDirs);
+      continue;
+    }
+    await removeDir(fullPath);
   }
 }
 
 export async function sweepOrphanUploadDirs() {
-  await sweepOrphanDirsIn(UPLOAD_ROOT);
-  await sweepOrphanDirsIn(RIP_ROOT);
+  const activeDirs = new Set(
+    [...mediaJobs.values()]
+      .map((job) => job.stagingDir || job.uploadDir)
+      .filter(Boolean)
+      .map((dir) => path.basename(dir))
+  );
+  await sweepOrphanDirsIn(UPLOAD_ROOT, activeDirs);
+  await sweepOrphanDirsIn(RIP_ROOT, activeDirs);
 }
 
 /** 定期清理过期任务与暂存文件 */
