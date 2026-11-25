@@ -108,6 +108,13 @@ export const api = {
       body: JSON.stringify({ sourcePath }),
     }),
 
+  /** 重置光盘来源：释放该来源（若为 ISO）自动挂载占用的挂载点 */
+  resetDiscSource: (sourcePath: string) =>
+    request<{ ok: boolean; released: boolean }>('/disc/reset', {
+      method: 'POST',
+      body: JSON.stringify({ sourcePath }),
+    }),
+
   startRip: (discJobId: string, titleIds: number[]) =>
     request<RipJob>(`/disc/${discJobId}/rip`, {
       method: 'POST',

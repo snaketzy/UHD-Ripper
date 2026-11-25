@@ -18,7 +18,7 @@ import { probeMedia } from '../lib/probe.js';
 import { buildPlan, normalizeSubtitleFormat } from '../lib/export.js';
 import { cancelBatchJob, runBatchJob } from '../lib/batch.js';
 import { buildSourceSpec, findMainStreamFile, scanDisc } from '../lib/disc.js';
-import { isIsoPath, mountIso, releaseIso } from '../lib/iso.js';
+import { isIsoPath, mountIso, releaseIso, unmountIso } from '../lib/iso.js';
 import { cancelRipJob, runRipJob } from '../lib/ripRunner.js';
 import { baseNameOf, uniqueFileName } from '../lib/trackName.js';
 import {
@@ -190,6 +190,17 @@ apiRouter.get('/disc/:id', (req, res) => {
     return;
   }
   res.json(serializeDiscJob(job));
+});
+
+/** 重置光盘来源：释放该来源（若为 ISO）自动挂载占用的挂载点 */
+apiRouter.post('/disc/reset', async (req, res, next) => {
+  try {
+    const sourcePath = String(req.body?.sourcePath || '').trim();
+    const released = sourcePath && isIsoPath(sourcePath) ? await unmountIso(sourcePath) : false;
+    res.json({ ok: true, released });
+  } catch (error) {
+    next(error);
+  }
 });
 
 /** 直接按绝对路径导入本地媒体文件，绕过 MakeMKV 扫描/提取流程 */

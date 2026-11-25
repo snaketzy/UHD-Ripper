@@ -47,6 +47,8 @@ export interface DiscState {
   ripStatus: RipStatus;
   ripError: string | null;
   ripJob: RipJob | null;
+  /** 「重置」进行中：正在释放来源挂载 */
+  resetBusy: boolean;
   /** 已经写入 items 列表的 mediaId，避免轮询重复添加 */
   importedMediaIds: string[];
 }
@@ -96,6 +98,7 @@ const initialState: MediaState = {
     ripStatus: 'idle',
     ripError: null,
     ripJob: null,
+    resetBusy: false,
     importedMediaIds: [],
   },
 
@@ -205,6 +208,19 @@ export const scanDiscSource = createAsyncThunk<DiscScanResult, void, { state: Ro
     }
   }
 );
+
+export const resetDiscSource = createAsyncThunk<
+  { ok: boolean; released: boolean },
+  void,
+  { state: RootState; rejectValue: string }
+>('media/resetDiscSource', async (_arg, { getState, rejectWithValue }) => {
+  const sourcePath = getState().media.disc.sourcePath.trim();
+  try {
+    return await api.resetDiscSource(sourcePath);
+  } catch (error) {
+    return rejectWithValue(error instanceof Error ? error.message : '重置失败');
+  }
+});
 
 export const pickLocalMediaFile = createAsyncThunk<
   { path?: string; cancelled?: boolean },
@@ -553,6 +569,28 @@ const mediaSlice = createSlice({
       .addCase(scanDiscSource.rejected, (state, action) => {
         state.disc.scanStatus = 'error';
         state.disc.scanError = action.payload || action.error.message || '扫描光盘失败';
+      })
+
+      .addCase(resetDiscSource.pending, (state) => {
+        state.disc.resetBusy = true;
+      })
+      .addCase(resetDiscSource.fulfilled, (state) => {
+        state.disc.resetBusy = false;
+        // 挂载已释放，路径与旧的扫描结果、提取进度随即失效，一并清空
+        state.disc.sourceKind = 'iso';
+        state.disc.sourcePath = '';
+        state.disc.pickerError = null;
+        state.disc.scan = null;
+        state.disc.scanStatus = 'idle';
+        state.disc.scanError = null;
+        state.disc.selectedTitleIds = [];
+        state.disc.ripJob = null;
+        state.disc.ripStatus = 'idle';
+        state.disc.ripError = null;
+      })
+      .addCase(resetDiscSource.rejected, (state, action) => {
+        state.disc.resetBusy = false;
+        state.disc.scanError = action.payload || action.error.message || '重置失败';
       })
 
       .addCase(pickLocalMediaFile.pending, (state) => {

@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Check, Disc3, FileSearch, FolderOpen, Loader2, TriangleAlert, X } from 'lucide-react';
+import { Check, Disc3, FileSearch, FolderOpen, Loader2, RotateCcw, TriangleAlert, X } from 'lucide-react';
 
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -23,6 +23,7 @@ import {
   pickLocalMediaFile,
   pickDiscSource,
   refreshRip,
+  resetDiscSource,
   scanDiscSource,
   startRip,
 } from '@/store/mediaSlice';
@@ -74,7 +75,8 @@ export function DiscSourceCard() {
   const localMediaPickerError = useAppSelector((state) => state.media.localMediaPickerError);
   const localMediaImportBusy = useAppSelector((state) => state.media.localMediaImportBusy);
   const localMediaImportError = useAppSelector((state) => state.media.localMediaImportError);
-  const { sourceKind, sourcePath, pickerBusy, pickerError, scanStatus, scanError, scan, selectedTitleIds } = disc;
+  const { sourceKind, sourcePath, pickerBusy, pickerError, scanStatus, scanError, scan, selectedTitleIds, resetBusy } =
+    disc;
   const { ripStatus, ripError, ripJob } = disc;
 
   const ripBusy = ripStatus === 'starting' || ripStatus === 'running';
@@ -107,7 +109,7 @@ export function DiscSourceCard() {
               void dispatch(pickDiscSource('iso'));
             }}
           >
-            {pickerBusy ? <Loader2 className="animate-spin" /> : <Disc3 />}
+            {pickerBusy && sourceKind === 'iso' ? <Loader2 className="animate-spin" /> : <Disc3 />}
             选择 ISO 文件
           </Button>
           <Button
@@ -118,7 +120,7 @@ export function DiscSourceCard() {
               void dispatch(pickDiscSource('folder'));
             }}
           >
-            {pickerBusy ? <Loader2 className="animate-spin" /> : <FolderOpen />}
+            {pickerBusy && sourceKind === 'folder' ? <Loader2 className="animate-spin" /> : <FolderOpen />}
             选择 BDMV 文件夹
           </Button>
           <Input
@@ -133,6 +135,15 @@ export function DiscSourceCard() {
           >
             {scanStatus === 'scanning' ? <Loader2 className="animate-spin" /> : <FileSearch />}
             {scanStatus === 'scanning' ? '扫描中…' : '解析光盘'}
+          </Button>
+          <Button
+            variant="outline"
+            title="清空扫描结果并释放自动挂载的 ISO"
+            disabled={resetBusy || scanStatus === 'scanning'}
+            onClick={() => void dispatch(resetDiscSource())}
+          >
+            {resetBusy ? <Loader2 className="animate-spin" /> : <RotateCcw />}
+            重置
           </Button>
         </div>
 

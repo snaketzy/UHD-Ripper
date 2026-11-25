@@ -76,6 +76,22 @@ export async function releaseIso(isoPath) {
   await fs.rmdir(entry.mountPoint).catch(() => {});
 }
 
+/**
+ * 忽略引用计数，强制卸载某个 ISO 并删除挂载点。
+ * 用于界面上的「重置」：用户主动释放挂载，不再等待引用归零。
+ * 返回是否确实卸载了一个挂载。
+ */
+export async function unmountIso(isoPath) {
+  const resolved = path.resolve(isoPath);
+  const entry = mountedIsos.get(resolved);
+  if (!entry) return false;
+
+  mountedIsos.delete(resolved);
+  await runHdiutil(['detach', entry.mountPoint]).catch(() => {});
+  await fs.rmdir(entry.mountPoint).catch(() => {});
+  return true;
+}
+
 /** 服务启动时清理上次运行遗留的 ISO 挂载（内存注册表已丢失，无法按引用计数释放） */
 export async function sweepIsoMounts() {
   if (process.platform !== 'darwin') return;
